@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CAN IDS Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h1>CAN IDS Dashboard</h1>
+  <div id="status">Connecting…</div>
+
+  <!-- LIVE TELEMETRY PANEL -->
+  <div id="live-stats" class="statsPanel">
+    <h2>📊 Live Vehicle Telemetry</h2>
+    <div class="stat">Speed: <span id="s_speed">--</span> km/h</div>
+    <div class="stat">RPM: <span id="s_rpm">--</span></div>
+    <div class="stat">Engine Load: <span id="s_load">--</span>%</div>
+    <div class="stat">Coolant Temp: <span id="s_coolant">--</span>°C</div>
+    <div class="stat">Intake Temp: <span id="s_intake">--</span>°C</div>
+    <div class="stat">Brake / ABS: <span id="s_brake">--</span></div>
+  </div>
+
+  <!-- GAUGES -->
+  <div class="gauges">
+    <div class="gauge-card">
+      <div class="gauge-title">Speed</div>
+      <div class="gauge">
+        <div class="gauge-needle" id="needle-speed"></div>
+        <div class="gauge-center"></div>
+      </div>
+      <div class="gauge-value"><span id="g_speed">--</span> km/h</div>
+    </div>
+
+    <div class="gauge-card">
+      <div class="gauge-title">RPM</div>
+      <div class="gauge">
+        <div class="gauge-needle" id="needle-rpm"></div>
+        <div class="gauge-center"></div>
+      </div>
+      <div class="gauge-value"><span id="g_rpm">--</span></div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts">
+    <div class="chart-card">
+      <div class="title">📈 Speed / RPM (last ~60 samples)</div>
+      <canvas id="speedRpmChart"></canvas>
+    </div>
+  </div>
+
+  <!-- MAIN GRID: FRAMES + DECODED + ALERTS -->
+  <div class="grid">
+    <!-- LEFT — FRAMES -->
+    <div class="box">
+      <div class="title">📡 Live CAN Frames</div>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>ID</th>
+              <th>HEX</th>
+              <th>DATA</th>
+              <th>Flags</th>
+            </tr>
+          </thead>
+          <tbody id="frames"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RIGHT — DECODED + ALERTS -->
+    <div class="box">
+      <div class="title">⚙ Decoded Signals</div>
+      <div id="decoded" class="scroll"></div>
+
+      <div class="title">🚨 Alerts</div>
+      <div id="alerts" class="scroll"></div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

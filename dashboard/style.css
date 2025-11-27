@@ -1,0 +1,212 @@
+body {
+  background: #0a0e20;
+  color: #e6e6e6;
+  font-family: Consolas, monospace;
+  margin: 0;
+  padding: 20px;
+}
+
+h1 {
+  margin: 0 0 10px;
+  font-weight: 800;
+  color: #00e0ff;
+}
+
+#status {
+  margin-bottom: 8px;
+  color: #ccc;
+}
+
+/* live telemetry panel */
+
+.statsPanel {
+  background: #0f182b;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  border: 1px solid #1d2742;
+}
+
+.statsPanel h2 {
+  margin-top: 0;
+  color: #37e0ff;
+}
+
+.stat {
+  font-size: 15px;
+  padding: 4px 0;
+}
+
+.stat span {
+  color: #00ff9d;
+  font-weight: bold;
+}
+
+/* gauges */
+
+.gauges {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+
+.gauge-card {
+  background: #101427;
+  border-radius: 8px;
+  padding: 10px 15px 15px;
+  border: 1px solid #22283f;
+  flex: 1 1 220px;
+  max-width: 260px;
+}
+
+.gauge-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #6be4ff;
+  text-align: center;
+}
+
+.gauge {
+  width: 120px;
+  height: 60px;
+  border-radius: 120px 120px 0 0;
+  border: 4px solid #1f2942;
+  border-bottom: none;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 120%, #1b2340, #090d1b);
+}
+
+.gauge-needle {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  width: 2px;
+  height: 70px;
+  background: #ff4b4b;
+  transform-origin: bottom center;
+  transform: rotate(-120deg); /* default */
+  transition: transform 0.12s linear;
+}
+
+.gauge-center {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #e6e6e6;
+}
+
+.gauge-value {
+  text-align: center;
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.gauge-value span {
+  color: #00ff9d;
+  font-weight: bold;
+}
+
+/* charts */
+
+.charts {
+  margin-bottom: 15px;
+}
+
+.chart-card {
+  background: #101427;
+  border-radius: 8px;
+  border: 1px solid #22283f;
+  padding: 10px;
+}
+
+.chart-card .title {
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: #6be4ff;
+}
+
+/* layout grid main */
+
+.grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 15px;
+  height: 48vh;
+}
+
+/* panel boxes */
+
+.box {
+  background: #101427;
+  border: 1px solid #22283f;
+  border-radius: 8px;
+  padding: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  font-size: 15px;
+  margin-bottom: 8px;
+  color: #6be4ff;
+  font-weight: 700;
+}
+
+/* table */
+
+table {
+  width: 100%;
+  border-spacing: 0;
+  font-size: 12px;
+}
+
+th {
+  background: #131a36;
+  position: sticky;
+  top: 0;
+  padding: 4px;
+  border-bottom: 1px solid #20263d;
+}
+
+td {
+  padding: 3px 4px;
+  border-bottom: 1px solid #172037;
+  color: #c9d3ff;
+}
+
+tr.alert-row td {
+  background: #551111;
+  color: #ffbebe;
+  font-weight: bold;
+}
+
+/* scrollable areas */
+
+.scroll {
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+/* decoded / alerts list */
+
+.decode-line {
+  padding: 4px 0;
+  border-bottom: 1px solid #23304d;
+  color: #9fe8ff;
+  font-size: 13px;
+}
+
+.alert-item {
+  font-size: 12px;
+  border-bottom: 1px solid #2a324f;
+  padding: 4px 0;
+}
