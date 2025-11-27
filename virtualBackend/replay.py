@@ -23,26 +23,21 @@ print(f"[INFO] Loaded {len(baseline_dlc)} DLC baseline entries\n")
 
 
 # ========== Adaptive Spoof Learning ==========
-history = {}          # min/max byte ranges
-last_time = {}        # msg_id → last seen real CAN time
-
-
+history = {}
+last_time = {}
 
 # ========== Timing / Replay Detection ==========
-timing = {}                         # msg_id → {avg,last}
-TIMING_LEARN_RATE = 0.05            # EMA speed
-REPLAY_FACTOR    = 0.35             # lower = more sensitive
-DELAY_FACTOR     = 2.0              # larger gap = suspicious
+timing = {}
+TIMING_LEARN_RATE = 0.05
+REPLAY_FACTOR    = 0.35
+DELAY_FACTOR     = 2.0
 
-
-# ========== DoS Variables ==========
+# ========== DoS Vars ==========
 msg_count_total = 0
 msg_count_id = {}
 WINDOW_START = time.time()
-
 BUS_RATE_LIMIT = 400
 ID_RATE_LIMIT = 120
-
 
 
 # ===================== PROCESS LOG =====================
@@ -53,60 +48,56 @@ with open(FILEPATH,"r") as f:
             continue
 
         try:
-            parts     = line.split()
-            msg_id    = int(parts[parts.index("ID:")+1],16)
-            dlc       = int(parts[parts.index("DLC:")+1])
-            raw_hex   = parts[parts.index("DLC:")+2 : parts.index("DLC:")+2+dlc]
-            payload   = bytes.fromhex(" ".join(raw_hex))
-            data      = list(payload)
+            parts = line.replace("=",":").split()  # safer split
 
-            # ===== Real CAN timestamp from log =====
+            # ---- SAFE ID + DLC PARSING FIX ----
+            msg_id = int(parts[parts.index("ID:")+1],16)   # always finds correct field now
+            dlc    = int(parts[parts.index("DLC:")+1])
+
+            # extract data bytes reliably
+            data_start = parts.index("DLC:") + 2
+            raw_hex = parts[data_start : data_start+dlc]
+            payload = bytes.fromhex(" ".join(raw_hex))
+            data = list(payload)
+
+
+            # ===== Timestamp detection FIX =====
             if parts[0].startswith("Timestamp:"):
-                now = float(parts[1])          # ← real message time
+                now = float(parts[1])        # log timestamp OK
             else:
-                now = time.time()              # fallback
-
+                now = time.time()            # fallback
 
 
             # ================= UNKNOWN ID =================
             if msg_id not in baseline_dlc:
                 print(f"🚨 UNKNOWN ID → {hex(msg_id)}")
 
-
             # ================= DLC MISMATCH =================
             if msg_id in baseline_dlc and dlc != baseline_dlc[msg_id]:
                 print(f"⚠ BAD DLC LENGTH → {hex(msg_id)} expected={baseline_dlc[msg_id]} got={dlc}")
 
 
-
-            # ================= TIMING ANOMALY DETECTION =================
+            # ================= TIMING ANOMALY =================
             if msg_id not in timing:
-                timing[msg_id] = {"avg":None, "last":now}          # first time seen
-
+                timing[msg_id] = {"avg":None,"last":now}
             else:
                 dt = now - timing[msg_id]["last"]
 
                 if timing[msg_id]["avg"] is None:
-                    timing[msg_id]["avg"] = dt                     # initialize baseline
+                    timing[msg_id]["avg"] = dt
                 else:
-                    # Smooth learning of normal interval timing
-                    timing[msg_id]["avg"] = (
-                        (timing[msg_id]["avg"]*(1-TIMING_LEARN_RATE)) + dt*TIMING_LEARN_RATE
-                    )
+                    timing[msg_id]["avg"] = timing[msg_id]["avg"]*(1-TIMING_LEARN_RATE) + dt*TIMING_LEARN_RATE
 
-                    # ------------ Replay / Too Fast ------------
-                    if dt < timing[msg_id]["avg"] * REPLAY_FACTOR:
+                    if dt < timing[msg_id]["avg"]*REPLAY_FACTOR:
                         print(f"🚨 REPLAY / FAST BURST → {hex(msg_id)} Δ={dt:.6f}s avg={timing[msg_id]['avg']:.6f}s")
 
-                    # ------------ Timing Delay (Opposite attack) ---------------
-                    if dt > timing[msg_id]["avg"] * DELAY_FACTOR:
+                    if dt > timing[msg_id]["avg"]*DELAY_FACTOR:
                         print(f"⚠ TIMING DELAY → {hex(msg_id)} Δ={dt:.6f}s avg={timing[msg_id]['avg']:.6f}s")
 
                 timing[msg_id]["last"] = now
 
 
-
-            # ================= SPOOFING RANGE =================
+            # ================= SPOOFING DETECT =================
             if msg_id not in history:
                 history[msg_id] = {"min":data[:], "max":data[:]}
 
@@ -116,33 +107,29 @@ with open(FILEPATH,"r") as f:
                         print(f"🚨 SPOOF RANGE → {hex(msg_id)} byte[{i}]={data[i]} "
                               f"(allowed {history[msg_id]['min'][i]}–{history[msg_id]['max'][i]})")
 
-                # Expand safe window
                 history[msg_id]["min"] = [min(history[msg_id]["min"][i],data[i]) for i in range(len(data))]
                 history[msg_id]["max"] = [max(history[msg_id]["max"][i],data[i]) for i in range(len(data))]
 
 
-
-            # ================= DoS DETECTION =================
+            # ================= DoS Detection =================
             msg_count_total += 1
             msg_count_id[msg_id] = msg_count_id.get(msg_id,0) + 1
 
             if now - WINDOW_START >= 1.0:
                 if msg_count_total > BUS_RATE_LIMIT:
-                    print(f"\n🔥 BUS FLOODING — {msg_count_total} msg/s (limit {BUS_RATE_LIMIT})")
+                    print(f"\n🔥 BUS FLOODING — {msg_count_total} msg/s")
 
                 for mid,count in msg_count_id.items():
                     if count > ID_RATE_LIMIT:
-                        print(f"🚨 DoS on ID {hex(mid)} → {count} msg/s")
+                        print(f"🚨 DoS on {hex(mid)} → {count} msg/s")
 
-                msg_count_total = 0
+                msg_count_total=0
                 msg_count_id.clear()
-                WINDOW_START = now
-
+                WINDOW_START=now
 
 
             # ================= OUTPUT =================
             print(f"[{now:.6f}s] ✔ {hex(msg_id):>6}  RAW: {' '.join(raw_hex)} | PARSED: {data}")
-
 
             bus.send(can.Message(arbitration_id=msg_id,data=payload))
             time.sleep(0.01)
