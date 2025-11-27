@@ -1,45 +1,44 @@
 import os
-import os
 from pathlib import Path
-
-SCRIPT_DIR = Path(__file__).resolve().parent   # folder of this script
-
-
-# ===== configure input log =====
 from dotenv import load_dotenv
+
+SCRIPT_DIR = Path(__file__).resolve().parent  # directory of this script
 load_dotenv()
 
-FILEPATH = os.getenv("FILEPATH")      # points to normalrun.txt
-baseline_file = SCRIPT_DIR / "baseline_ids.txt"    # where learned IDs will be stored
+FILEPATH = os.getenv("FILEPATH")  # normalrun.txt path
+baseline_dlc_file = SCRIPT_DIR / "baseline_dlc.txt"
 
-# ===== storage for extracted IDs =====
-learned_ids = set()
+# Storage: ID → DLC
+learned_dlc = {}
 
-# ===== extract all IDs from logfile =====
+# ===== Extract ID & DLC from log =====
 with open(FILEPATH, "r") as f:
     for line in f:
-        if "ID:" not in line:
+        if "ID:" not in line or "DLC:" not in line:
             continue
 
         try:
-            # get everything after "ID:"
             msg_id_str = line.split("ID:")[1].split()[0]
-            msg_id = int(msg_id_str, 16)   # convert hex string -> integer
-            learned_ids.add(msg_id)
+            dlc_str = line.split("DLC:")[1].split()[0]
+
+            msg_id = int(msg_id_str, 16)
+            dlc = int(dlc_str)
+
+            learned_dlc[msg_id] = dlc  # last seen wins (normal)
 
         except:
-            pass  # just skip if anything doesnt parse
+            continue
 
+# ===== Save as ID,DLC baseline =====
+with open(baseline_dlc_file, "w") as f:
+    for msg_id in sorted(learned_dlc.keys()):
+        f.write(f"{hex(msg_id)},{learned_dlc[msg_id]}\n")
 
-# ===== save baseline to file AS HEX =====
-with open(baseline_file, "w") as f:
-    for msg_id in sorted(learned_ids):
-        f.write(f"{hex(msg_id)}\n")
+# ===== Output preview =====
+print("\n===== ✔ Baseline Learned =====")
+print("DLC profile saved to:", baseline_dlc_file)
+print(f"Total IDs recorded: {len(learned_dlc)}\n")
 
-print("✔ Baseline learned successfully")
-print("✔ IDs saved to:", baseline_file)
-print(f"Total IDs found: {len(learned_ids)}")
-print("\nBaseline content:\n")
-
-for msg_id in learned_ids:
-    print(hex(msg_id))
+print("Baseline DLC Mapping (ID → DLC):\n")
+for msg_id,dlc in learned_dlc.items():
+    print(f"{hex(msg_id)} → DLC={dlc}")
