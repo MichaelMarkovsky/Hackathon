@@ -30,7 +30,8 @@ last_time = {}        # msg_id → last timestamp for replay
 
 
 # ========== Replay Sensitivity (seconds) ==========
-REPLAY_THRESHOLD = 0.045  
+timing = {}  # msg_id → {avg: float, last: timestamp}
+TIMING_LEARN_RATE = 0.05  # smaller=slower learning
 
 
 # ========== DoS Detection Variables ==========
@@ -56,7 +57,12 @@ with open(FILEPATH,"r") as f:
             raw_hex   = parts[parts.index("DLC:")+2 : parts.index("DLC:")+2+dlc]
             payload   = bytes.fromhex(" ".join(raw_hex))
             data      = list(payload)
-            now       = time.time()
+            # Extract real CAN timestamp from log
+            if parts[0].startswith("Timestamp:"):
+                now = float(parts[1])        # ← REAL timestamp from log
+            else:
+                now = time.time()            # fallback
+
 
 
             # ================= UNKNOWN ID =================
@@ -71,10 +77,28 @@ with open(FILEPATH,"r") as f:
 
 
             # ================= REPLAY ATTACK =================
-            if msg_id in last_time and (now - last_time[msg_id]) < REPLAY_THRESHOLD:
-                print(f"🚨 REPLAY ATTACK → {hex(msg_id)} sent too fast")
-            last_time[msg_id] = now
+            if msg_id not in timing:
+                timing[msg_id] = {"avg": None, "last": now}
+            else:
+                dt = now - timing[msg_id]["last"]
 
+                if timing[msg_id]["avg"] is None:
+                    timing[msg_id]["avg"] = dt  # first interval
+                else:
+                    # Exponential moving average
+                    timing[msg_id]["avg"] = (
+                        timing[msg_id]["avg"]*(1-TIMING_LEARN_RATE) + dt*TIMING_LEARN_RATE
+                    )
+
+                    # 🚨 Fast replay / flooding
+                    if dt < timing[msg_id]["avg"]*0.35:
+                        print(f"🚨 FLOOD / REPLAY → {hex(msg_id)} Δ={dt:.6f}s avg={timing[msg_id]['avg']:.6f}s")
+
+                    # ⚠ Slow delayed timing anomaly
+                    if dt > timing[msg_id]["avg"]*2.0:
+                        print(f"⚠ TIMING DELAY → {hex(msg_id)} Δ={dt:.6f}s avg={timing[msg_id]['avg']:.6f}s")
+
+                timing[msg_id]["last"] = now
 
 
             # ================= SPOOFING RANGE BREAK =================
@@ -117,7 +141,10 @@ with open(FILEPATH,"r") as f:
 
 
             # ================= PRINT =================
-            print(f"[OK] {hex(msg_id)} → RAW: {' '.join(raw_hex)} | PARSED: {data}")
+            def print_ok(ts, msg_id, raw_hex, data):
+                print(f"[{ts:.6f}s] ✔ {hex(msg_id):>6}  RAW: {' '.join(raw_hex)} | PARSED: {data}")
+
+            print_ok(now, msg_id, raw_hex, data)
 
 
             # Send to virtual CAN
