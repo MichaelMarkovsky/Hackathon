@@ -5,93 +5,84 @@ import os
 from pathlib import Path
 
 
-# ================== CAN BUS ==================
 bus = can.Bus(interface='virtual')
-
 load_dotenv()
 FILEPATH = os.getenv("FILEPATH")
 
-
-# ================== LOAD BASELINE DLC ==================
 SCRIPT_DIR = Path(__file__).resolve().parent
 baseline_dlc_file = SCRIPT_DIR / "baseline_dlc.txt"
 
-baseline_dlc = {}
+
+# ==================== Load DLC Baseline ====================
+baseline_dlc = {}    # msg_id → expected DLC
+
 if baseline_dlc_file.exists():
-    with open(baseline_dlc_file, "r") as f:
-        for line in f:
-            if not line.strip(): continue
-            msg_hex, dlc = line.split(",")
-            baseline_dlc[int(msg_hex,16)] = int(dlc)
+    for line in open(baseline_dlc_file):
+        msg, dlc = line.strip().split(",")
+        baseline_dlc[int(msg,16)] = int(dlc)
 
-print(f"\nLoaded {len(baseline_dlc)} DLC profiles\n")
+print(f"[INFO] Loaded {len(baseline_dlc)} DLC baseline entries\n")
 
 
-# ================== PER-ID SPOOF THRESHOLDS ==================
-spoof_thresholds = {
-    0x130: 600,  # Fast changing — likely RPM/Torque
-    0x131: 600,
-    0x350: 550,
-    0x545: 350,
-    0x2a0: 350,
-    0x529: 350 if 0x329 else None,
-    0x260: 250,
-    0x2c0: 150,
-}
-
-DEFAULT_SPOOF_THRESHOLD = 300      # fallback if ID not present
-
-# store last payload for comparing
-last_data = {}
+# ==================== Adaptive Learning ====================
+history      = {}    # msg_id → {"min":[...],"max":[...]}
+last_time    = {}    # msg_id → last timestamp
+REPLAY_THRESHOLD = 0.045   # 45ms = too fast = replay attack
 
 
-
-# ================== PROCESS LOG ==================
-with open(FILEPATH, "r") as f:
+# ==================== Process CAN Log ====================
+with open(FILEPATH,"r") as f:
     for line in f:
+
         if "ID:" not in line or "DLC:" not in line:
-            continue
-        
+            continue   # skip lines without CAN structure
+
         try:
-            parts = line.split()
+            parts     = line.split()
+            msg_id    = int(parts[parts.index("ID:")+1],16)
+            dlc       = int(parts[parts.index("DLC:")+1])
+            raw_hex   = parts[parts.index("DLC:")+2 : parts.index("DLC:")+2+dlc]
+            payload   = bytes.fromhex(" ".join(raw_hex))
+            data      = list(payload)
+            now       = time.time()
 
-            # ----- ID -----
-            msg_id = int(parts[parts.index("ID:")+1],16)
 
+            # ================= UNKNOWN ID CHECK =================
             if msg_id not in baseline_dlc:
-                print(f"❓UNKNOWN ID → {hex(msg_id)} (not in DLC baseline)")
+                print(f"🚨 UNKNOWN ID DETECTED → {hex(msg_id)} (not in baseline!)")
 
-            # ----- DLC -----
-            dlc = int(parts[parts.index("DLC:")+1])
+
+            # ================= DLC MISMATCH =================
             if msg_id in baseline_dlc and dlc != baseline_dlc[msg_id]:
-                print(f"⚠ DLC MISMATCH → {hex(msg_id)} expected={baseline_dlc[msg_id]} got={dlc}")
+                print(f"⚠ BAD DLC LENGTH → {hex(msg_id)} expected={baseline_dlc[msg_id]} got={dlc}")
 
 
-            # ----- DATA -----
-            data_tokens = parts[parts.index("DLC:")+2 : parts.index("DLC:")+2 + dlc]
-            data_bytes = bytes.fromhex(" ".join(data_tokens))
+            # ================= REPLAY ATTACK DETECTION =================
+            if msg_id in last_time and (now - last_time[msg_id]) < REPLAY_THRESHOLD:
+                print(f"🚨 REPLAY ATTACK DETECTED → {hex(msg_id)} sent repeatedly too fast")
+            last_time[msg_id] = now
 
 
-            # ===== SPOOF DETECTION WITH PER-ID THRESHOLDS =====
-            TH = spoof_thresholds.get(msg_id, DEFAULT_SPOOF_THRESHOLD)
+            # ================= SPOOFING RANGE DETECTION =================
+            if msg_id not in history:
+                history[msg_id] = {"min":data[:], "max":data[:]}
+            else:
+                for i in range(len(data)):
+                    if not history[msg_id]["min"][i] <= data[i] <= history[msg_id]["max"][i]:
+                        print(f"🚨 SPOOF RANGE → {hex(msg_id)} byte[{i}]={data[i]} "
+                              f"(allowed {history[msg_id]['min'][i]}–{history[msg_id]['max'][i]})")
 
-            if msg_id in last_data:
-                diff = sum(abs(data_bytes[i] - last_data[msg_id][i]) for i in range(len(data_bytes)))
-                if diff > TH:
-                    print(f"🚨 SPOOFING DETECTED → {hex(msg_id)} Δ={diff} (threshold {TH})")
-            
-            last_data[msg_id] = list(data_bytes)
-
-
-            # ================== SEND + PRINT ==================
-            msg = can.Message(arbitration_id=msg_id, data=data_bytes)
-            bus.send(msg)
-
-            raw_str = " ".join(data_tokens)
-            print(f"[OK] {hex(msg_id)} → RAW: {raw_str} | BYTES: {data_bytes!r}")
+                # expand safe range automatically (adaptive learning)
+                history[msg_id]["min"] = [min(history[msg_id]["min"][i],data[i]) for i in range(len(data))]
+                history[msg_id]["max"] = [max(history[msg_id]["max"][i],data[i]) for i in range(len(data))]
 
 
+            # ================= Output =================
+            print(f"[OK] {hex(msg_id)} → RAW: {' '.join(raw_hex)} | PARSED: {data}")
+
+
+            bus.send(can.Message(arbitration_id=msg_id,data=payload))
             time.sleep(0.01)
 
         except Exception as e:
-            print("Parse Error:", e, "\nLine:", line)
+            print("Parse error:", e, "\nLine:", line)
