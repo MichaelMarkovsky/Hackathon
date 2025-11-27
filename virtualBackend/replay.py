@@ -5,62 +5,71 @@ import os
 from pathlib import Path
 
 
-
+# ================== CAN BUS ==================
 bus = can.Bus(interface='virtual')
 
-load_dotenv()  # loads .env variables into environment
+load_dotenv()
+FILEPATH = os.getenv("FILEPATH")   # log file to replay
 
-FILEPATH = os.getenv("FILEPATH")
 
-
-# ===== load previous baseline =====
+# ================== LOAD BASELINE DLC ==================
 SCRIPT_DIR = Path(__file__).resolve().parent
-baseline_file = SCRIPT_DIR / "baseline_ids.txt"
-known_ids = set()
+baseline_dlc_file = SCRIPT_DIR / "baseline_dlc.txt"   # << NEW
 
-if os.path.exists(baseline_file):
-    with open(baseline_file, "r") as f:
-        known_ids = {int(line.strip(), 16) for line in f}
+baseline_dlc = {}   # msg_id → dlc
+
+if baseline_dlc_file.exists():
+    with open(baseline_dlc_file, "r") as f:
+        for line in f:
+            line=line.strip()
+            if not line: 
+                continue
+            try:
+                msg_id_hex, dlc = line.split(",")
+                baseline_dlc[int(msg_id_hex,16)] = int(dlc)
+            except:
+                pass
+
+print(f"Loaded {len(baseline_dlc)} baseline IDs\n")
 
 
-
+# ================== PROCESS LOG ==================
 with open(FILEPATH, "r") as f:
     for line in f:
         line = line.strip()
-        if not line:
+        if "ID:" not in line or "DLC:" not in line:
             continue
 
         try:
             parts = line.split()
 
-            # Find ID
-            id_idx = parts.index("ID:")      # ... ID: 02b0 ...
-            msg_id_str = parts[id_idx + 1]   # "02b0"
-            msg_id = int(msg_id_str, 16)
+            # ----- CAN ID -----
+            msg_id = int(parts[parts.index("ID:")+1],16)
+
+            # Unknown ID detection
+            if msg_id not in baseline_dlc:
+                print(f"UNKNOWN ID → {hex(msg_id)}")
+
+            # ----- DLC -----
+            dlc = int(parts[parts.index("DLC:")+1])
+
+            # DLC anomaly detection
+            if msg_id in baseline_dlc and dlc != baseline_dlc[msg_id]:
+                print(f"DLC MISMATCH → {hex(msg_id)} expected={baseline_dlc[msg_id]} got={dlc}")
 
 
-            if msg_id not in known_ids:
-                print("Anomaly: unknown ID ->", hex(msg_id))
-              
-
-
-            # Find DLC
-            dlc_idx = parts.index("DLC:")    # ... DLC: 5 ...
-            dlc = int(parts[dlc_idx + 1])    # 5
-
-            # Data bytes start right after DLC value
-            data_tokens = parts[dlc_idx + 2 : dlc_idx + 2 + dlc]
-
-            # Join them into a single hex string and convert to bytes
+            # ----- Extract data -----
+            data_tokens = parts[parts.index("DLC:")+2 : parts.index("DLC:")+2+dlc]
             data_bytes = bytes.fromhex(" ".join(data_tokens))
 
+
+            # ----- SEND INTO vCAN -----
             msg = can.Message(arbitration_id=msg_id, data=data_bytes)
             bus.send(msg)
+            raw_hex = " ".join(parts[parts.index("DLC:")+2 : parts.index("DLC:")+2+dlc])
+            print(f"[OK] {hex(msg_id)} → RAW: {raw_hex} | PARSED: {data_bytes}")
 
-   
-            print(msg)
 
-            
             time.sleep(0.01)
 
         except Exception as e:
