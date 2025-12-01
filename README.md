@@ -97,13 +97,22 @@ Timestamp: 1479121434.850977        ID: 0430    000    DLC: 8    00 00 00 00 00 
 
 ## Usage
 
+0. Create `.env` inside `virtual_backend/`:
+
+    virtual_backend/.env
+    `FILEPATH=./normalrun.txt`
+     *or set absolute file path if dataset is elsewhere*
+
 1. Generate baseline (required once):
+
     `python virtual_backend/baseline_learn.py`
 
 2. Open dashboard UI in browser:
-    `dashboard/index.html`    (or open with Live Server)
+
+    `dashboard/index.html`      *or open with Live Server*
 
 3. Run simulation + intrusion detection:
+
     `python virtual_backend/replay.py`
 
 
