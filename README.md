@@ -1,4 +1,4 @@
-# CarSniffer — CAN Bus Intrusion Detection System
+# CarSniffer - CAN Bus Intrusion Detection System
 
 A CAN-network intrusion detection system that **sniffs, visualizes, learns baselines, and detects attacks** on automotive CAN traffic in real time.
 
