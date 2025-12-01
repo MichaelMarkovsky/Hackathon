@@ -92,7 +92,6 @@ If a frame violates expected behavior (wrong DLC, replay signature, abnormal spi
 Timestamp: 1479121434.850202        ID: 0350    000    DLC: 8    05 28 84 66 6d 00 00 a2
 Timestamp: 1479121434.850423        ID: 02c0    000    DLC: 8    14 00 00 00 00 00 00 00
 Timestamp: 1479121434.850977        ID: 0430    000    DLC: 8    00 00 00 00 00 00 00 00
-
 ```
 
 ## Usage
