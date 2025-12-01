@@ -69,8 +69,8 @@ If a frame violates expected behavior (wrong DLC, replay signature, abnormal spi
 
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/3e02b7b2-8b5c-4ebc-a456-b0ed2cc0f434" height="240"/>
-  <img src="https://github.com/user-attachments/assets/f53e9059-9c3a-4212-9183-d9ff7fd645d7" height="220"/>
+  <img src="https://github.com/user-attachments/assets/3e02b7b2-8b5c-4ebc-a456-b0ed2cc0f434" height="220"/>
+  <img src="https://github.com/user-attachments/assets/f53e9059-9c3a-4212-9183-d9ff7fd645d7" height="200"/>
 </p>
 
 ---
